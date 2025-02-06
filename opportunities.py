@@ -63,11 +63,16 @@ def main():
     content = str(browser.page_source)
 
 # <li class="tab full-schedules selected">
-    if not 'class="tab full-schedules selected"' in content:  # todo is there a better validation?
+    # try again
+    if not 'class="tab full-schedules selected"' in content:
+        browser.get(full_schedules)
+        content = str(browser.page_source)
+        
+    if not 'class="tab full-schedules selected"' in content:
         with open(FAILED_LOGIN_RESULT, 'w+') as f:
             f.write(content)
-        errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
         errprint("Cannot find tab selector in content at: " + full_schedules)
+        errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
         sys.exit(1)
 
     current_events = parseRotunda(content)
@@ -91,7 +96,7 @@ def print_diff(list):
     # print to stdout all changes that were found
     list.sort(key=lambda x: x['datetime'])
     for event in list:
-        print(event["name"], event["datetime"], ', https://secure.rotundasoftware.com%s'
+        print(event["name"], "inside of dates", event["daterange"], ", ", event["datetime"], ', https://secure.rotundasoftware.com%s'
               % (event['href']), '\n')
 
 
@@ -120,7 +125,17 @@ def parseRotunda(content):
         # Thu, 6:30 PM - 9:30 PM - at null(Terrapin Family Band & Special Guest)
         name = re.sub(r'.*null\(', '', name)
         name = name.replace(')', '')
-        events[id] = { 'href': id, 'datetime': datetime, 'name': name }
+        
+        daterange = ""
+        for parent in gig.parents:
+            if parent.has_attr('class'):
+                # print("parent found w/ class: ", parent.get('class'))
+                if parent.get('class') == ['modui-base', 'mass-group-view']:
+                    # print("parent text found:  ", parent.contents)
+                    soup2 = BeautifulSoup(str(parent), 'html.parser')
+                    daterange = soup2.find('div', class_ = 'mass-group-label').get_text()
+                    break
+        events[id] = { 'href': id, 'daterange':daterange, 'datetime': datetime, 'name': name }
         
     return events
 
@@ -158,6 +173,7 @@ def pretty_datetime():
 
 
 def save_page(content):
+    # errprint("saving page to %s" % DOWNLOAD_DIR)
     filename = DOWNLOAD_DIR + "opportunities-%s.html" % pretty_datetime()
     files = os.listdir(DOWNLOAD_DIR)
     with open(filename, 'w+') as f:
