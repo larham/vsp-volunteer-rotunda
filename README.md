@@ -65,7 +65,7 @@ url=https://docs.google.com/myFormId/formResponse?usp=pp_url&submit=Submit
 
 Invoking the notifier is then as:
 
-`./notify.py opportunities.properties`
+`./notify.py guild.properties`
 
 ## Cron
 You may want to make a `cron` job to run this periodically. A provided script `cron.sh` helps with the complications of path and output of cron jobs. It assumes that the current directory is set correctly. A cron job something like the following will invoke it hourly between 9am and 10pm.
