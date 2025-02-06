@@ -1,16 +1,15 @@
 # Opportunities
-## Monitor new volunteer opportunities at Volunteer Scheduler Pro (VSP) by Rotunda Software at rotundasoftware.com 
+## Monitor new volunteer opportunities from Volunteer Scheduler Pro (VSP) at rotundasoftware.com 
 
-The Volunteer Scheduler Pro™ website provides a way to organize volunteers.
+The VSP website provides a way to volunteer.
 
 However, there is no current feature for volunteers to get notifications when new opportunities are added, at least for some organizations.
 
 This tool can tell when new opportunities appear. If new opportunities are available (compared to the last time it was run), it will print out lines like
 
 ```
-Wallflowers Fri, 6:30 PM - 9:00 PM , https://secure.rotundasoftware.com/...
-
-Wallflowers Sat, 6:30 PM - 9:00 PM , https://secure.rotundasoftware.com/...
+My Band Name, Fri, 6:30 PM - 9:00 PM within date range: May 23 - May 24, https://secure.rotundasoftware.com/...
+My Band Name, Sat, 6:30 PM - 9:00 PM within date range: May 23 - May 24, , https://secure.rotundasoftware.com/...
 ```
 
 ## Installation
