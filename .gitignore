@@ -7,4 +7,4 @@ opportunities.egg-info/
 build/
 dist/
 .vscode/
-opportunities-20*
+opportunities/
