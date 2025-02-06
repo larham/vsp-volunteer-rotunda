@@ -19,8 +19,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
 
-# sample URL like https://secure.rotundasoftware.com/30/web-terminal/login/my_organization?killSession=1
-
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
 DOWNLOAD_DIR = os.path.dirname(os.path.abspath(
     __file__)) + "/opportunities/"
@@ -48,8 +46,8 @@ def main():
 
     # why no redirect after login?
     
-    # https://secure.rotundasoftware.com/30/web-terminal/login/guildtheatre?killSession=1
-    # https://secure.rotundasoftware.com/30/web-terminal/home
+    # .../web-terminal/login/guildtheatre?killSession=1
+    # .../web-terminal/home
     home = re.sub(r'\/login\/.*', '/home', url)
     browser.get(home)
 
@@ -57,14 +55,13 @@ def main():
         errprint("login unsuccessful")
         sys.exit(1)
 
-    # https://secure.rotundasoftware.com/30/web-terminal/full-schedules
+    # .../web-terminal/full-schedules
     full_schedules = re.sub(r'\/login\/.*', '/full-schedules', url)
     browser.get(full_schedules)
     content = str(browser.page_source)
 
-# <li class="tab full-schedules selected">
-    # try again
     if not 'class="tab full-schedules selected"' in content:
+        # try again
         browser.get(full_schedules)
         content = str(browser.page_source)
         
@@ -112,9 +109,6 @@ def parseRotunda(content):
         return {}
     events = {}
     
-    # soup = BeautifulSoup(content, 'html.parser')
-# <td class="modui-base ministry-group-view label"><a class="mass-label-link" data-msid="714996_a6737dcb100d6e5005" data-lwpid="714997" href="/30/web-terminal/home/714996/a6737dcb100d6e5005" target="_top">Thu, 6:30 PM - 9:30 PM</a> - at null<br>(Terrapin Family Band &amp; Special Guest)</td>
-
     soup = BeautifulSoup(content, 'html.parser')
     gigs = soup.find_all('td', class_='modui-base ministry-group-view label')
     for gig in gigs:
@@ -122,7 +116,7 @@ def parseRotunda(content):
         id = link['href']
         datetime = link.get_text()
         name = gig.get_text()
-        # Thu, 6:30 PM - 9:30 PM - at null(Terrapin Family Band & Special Guest)
+        # Thu, 6:30 PM - 9:30 PM - at null(Some Band Name)
         name = re.sub(r'.*null\(', '', name)
         name = name.replace(')', '')
         
