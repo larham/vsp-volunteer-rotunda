@@ -93,7 +93,7 @@ def print_diff(list):
     # print to stdout all changes that were found
     list.sort(key=lambda x: x['datetime'])
     for event in list:
-        print(event["name"], ", ", event["datetime"], ", within date range: ", event["daterange"], ", " ', https://secure.rotundasoftware.com%s'
+        print(event["name"], ", ", event["datetime"], ", within date range: ", event["daterange"], ', https://secure.rotundasoftware.com%s'
               % (event['href']))
 
 
