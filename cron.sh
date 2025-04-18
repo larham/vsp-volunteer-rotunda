@@ -4,6 +4,9 @@
 # run via something like: 0 9-22 * * * /usr/bin/bash $INSTALL_DIR/cron.sh >> $LOG 2>&1
 
 LOG=/tmp/opportunities.log
+
+echo "Running cron.sh at $(date)" >> $LOG 2>&1
+
 INSTALL_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
