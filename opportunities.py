@@ -13,8 +13,10 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from urllib3.exceptions import ReadTimeoutError
 
 from bs4 import BeautifulSoup
 
@@ -25,6 +27,7 @@ DOWNLOAD_DIR = os.path.dirname(os.path.abspath(
 FAILED_LOGIN_RESULT = "/tmp/post_login_result.html"
 OPPORTUNITIES_FILE_BASE = "opportunities-"
 NUM_OLD_FILES_PRESERVED = 10
+ERR_CODE_TIMEOUT = 33
 
 
 def main():
@@ -49,22 +52,27 @@ def main():
     # .../web-terminal/login/guildtheatre?killSession=1
     # .../web-terminal/home
     home = re.sub(r'\/login\/.*', '/home', url)
-    browser.get(home)
+    
+    try:
+        browser.get(home)
 
-    if not is_logged_in(browser):
-        errprint("login unsuccessful")
-        sys.exit(1)
+        if not is_logged_in(browser):
+            errprint("login unsuccessful")
+            sys.exit(1)
 
-    # .../web-terminal/full-schedules
-    full_schedules = re.sub(r'\/login\/.*', '/full-schedules', url)
-    browser.get(full_schedules)
-    content = str(browser.page_source)
-
-    if not 'class="tab full-schedules selected"' in content:
-        # try again
+        # .../web-terminal/full-schedules
+        full_schedules = re.sub(r'\/login\/.*', '/full-schedules', url)
         browser.get(full_schedules)
         content = str(browser.page_source)
-        
+
+        if not 'class="tab full-schedules selected"' in content:
+            # try again
+            browser.get(full_schedules)
+            content = str(browser.page_source)
+    except ReadTimeoutError:
+        errprint("fetch timed out; quitting")
+        sys.exit(ERR_CODE_TIMEOUT)
+            
     if not 'class="tab full-schedules selected"' in content:
         with open(FAILED_LOGIN_RESULT, 'w+') as f:
             f.write(content)
@@ -147,17 +155,21 @@ def prompt_login_creds():
 
 def login(browser, url, user, password):
     errprint("attempting to log in...")
-    browser.get(url)
-    # wait for full rendering
-    submit = WebDriverWait(browser, 15).until(
-        EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))
+    try:
+        browser.get(url)
+        # wait for full rendering
+        submit = WebDriverWait(browser, 15).until(
+            EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))
 
-    email = browser.find_element(By.NAME, "username")
-    email.send_keys(user)
-    passwd = browser.find_element(By.NAME, "value")
-    passwd.send_keys(password)
-    submit.click()
-    WebDriverWait(browser, 15).until(EC.url_changes(browser.current_url))
+        email = browser.find_element(By.NAME, "username")
+        email.send_keys(user)
+        passwd = browser.find_element(By.NAME, "value")
+        passwd.send_keys(password)
+        submit.click()
+        WebDriverWait(browser, 15).until(EC.url_changes(browser.current_url))
+    except TimeoutException:
+        errprint("login timed out; quitting")
+        sys.exit(ERR_CODE_TIMEOUT)
     errprint("url after login: %s" % browser.current_url)
 
 

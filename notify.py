@@ -21,7 +21,8 @@ def main():
                           text=True,
                           capture_output=True)
 
-    if call.returncode != 0:
+    # use return code 33 as signal for timeout, no need to report
+    if call.returncode != 0 and call.returncode != 33:
         data = parse.urlencode({param: call.stderr}).encode()
         req = request.Request(url, data=data)  # makes the method "POST"
         request.urlopen(req)
