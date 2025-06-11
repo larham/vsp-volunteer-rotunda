@@ -237,7 +237,11 @@ def get_browser():
     options.add_argument('disable-dev-shm-usage')
     options.add_argument(f'user-agent={USER_AGENT}')
     
-    return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+    try:
+        return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+    except TimeoutError:
+        errprint("timeout getting browser; exiting")
+        sys.exit(ERR_CODE_TIMEOUT)
 
 
 def get_user_pass():
