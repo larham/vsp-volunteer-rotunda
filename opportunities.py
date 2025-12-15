@@ -220,7 +220,7 @@ def is_logged_in(browser):
     # a redirect to a page with a login means that you have NOT successfully logged in.
     # a page with a login has "Sign In" in text.
     content = str(browser.page_source)
-    success = "Don't have an account yet?" not in content and "Full Schedules" in content
+    success = "Don't have an account yet?" not in content and "Usher" in content
     if not success:
         with open(FAILED_LOGIN_RESULT, 'w+') as f:
             f.write(browser.page_source)
@@ -239,8 +239,8 @@ def get_browser():
     
     try:
         return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-    except TimeoutError:
-        errprint("timeout getting browser; exiting")
+    except OSError as e:
+        errprint("error getting browser; exiting", e)
         sys.exit(ERR_CODE_TIMEOUT)
 
 
