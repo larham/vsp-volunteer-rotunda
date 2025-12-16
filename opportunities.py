@@ -73,12 +73,12 @@ def main():
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
             
-    if not 'class="tab full-schedules selected"' in content:
-        with open(FAILED_LOGIN_RESULT, 'w+') as f:
-            f.write(content)
-        errprint("Cannot find tab selector in content at: " + full_schedules)
-        errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
-        sys.exit(1)
+    # if not 'class="tab full-schedules selected"' in content:
+    #     with open(FAILED_LOGIN_RESULT, 'w+') as f:
+    #         f.write(content)
+    #     errprint("Cannot find tab selector in content at: " + full_schedules)
+    #     errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
+    #     sys.exit(1)
 
     current_events = parseRotunda(content)
     prev_events = parseRotunda(prev_content)
