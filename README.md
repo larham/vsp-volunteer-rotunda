@@ -1,4 +1,5 @@
 # Opportunities
+
 ## Monitor new volunteer opportunities from Volunteer Scheduler Pro (VSP) at rotundasoftware.com 
 
 The VSP website provides a way to volunteer.
@@ -7,18 +8,18 @@ However, there is no current feature for volunteers to get notifications when ne
 
 This tool can tell when new opportunities appear. If new opportunities are available (compared to the last time it was run), it will print out lines like
 
-```
+```output
 My Band Name, Fri, 6:30 PM - 9:00 PM within date range: May 23 - May 24, https://secure.rotundasoftware.com/...
 My Band Name, Sat, 6:30 PM - 9:00 PM within date range: May 23 - May 24, https://secure.rotundasoftware.com/...
 ```
 
 ## Installation
+
 On ubuntu linux, the provided `./install_python_selenium.sh` adds the python & selenium tools necessary.
 
-On a mac OS you can install with `brew install python3 chromedriver` (assuming `homebrew` is already installed). 
+On a mac OS you can install with `brew install python3 chromedriver` (assuming `homebrew` is already installed).
 
-On any platform, the `direnv` tool is recommended 
-since a dotfile script is included to help automation.
+On any platform, the `direnv` tool is recommended since a dotfile script is included to help automation.
 
 Requirements for python pip modules are listed in `setup.py`. The command to install/update all modules is:
 
@@ -32,7 +33,7 @@ The command to run Opportunities is:
 
 The program will prompt you for your username, password, and url.  
 
-Your url for your organization starts with https://secure.rotundasoftware.com, and may have your organization's name in it.
+Your url for your organization starts with 'https://secure.rotundasoftware.com', and may have your organization's name in it.
 
 The first time you run the program, there will be no output since there is no comparison history yet. The next time you run it, it will have a comparison, and will show new opportunities if there are any.
 
@@ -68,9 +69,10 @@ Invoking the notifier is then as:
 `./notify.py guild.properties`
 
 ## Cron
+
 You may want to make a `cron` job to run this periodically. A provided script `cron.sh` helps with the complications of path and output of cron jobs. It assumes that the current directory is set correctly. A cron job something like the following will invoke it hourly between 9am and 10pm.
 
-```
+```cron
 LOG=/tmp/opportunities.log
 INSTALL_DIR=/path/to/opportunities/
 0 9-22 * * * date > $LOG && cd $INSTALL_DIR >> $LOG 2>&1  && /usr/bin/bash $INSTALL_DIR/cron.sh >> $LOG 2>&1
