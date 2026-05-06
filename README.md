@@ -15,15 +15,13 @@ My Band Name, Sat, 6:30 PM - 9:00 PM within date range: May 23 - May 24, https:/
 
 ## Installation
 
-On ubuntu linux, the provided `./install_python_selenium.sh` adds the python & selenium tools necessary.
-
-On a mac OS you can install with `brew install python3 chromedriver` (assuming `homebrew` is already installed).
-
 On any platform, the `direnv` tool is recommended since a dotfile script is included to help automation.
 
-Requirements for python pip modules are listed in `setup.py`. The command to install/update all modules is:
+The program requires python version 3+, which on a mac you can install with `brew install python3` (assuming `homebrew` already installed). For a more automated approach, use `direnv`, for which a dotfile already exists.
 
-`python setup.py install`
+The command to install  dependencies is:
+
+`python -m pip install  .`
 
 ## How to run the program `opportunities.py` to see if there are new opportunities
 
