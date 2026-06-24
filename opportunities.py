@@ -28,12 +28,14 @@ FAILED_LOGIN_RESULT = "/tmp/post_login_result.html"
 OPPORTUNITIES_FILE_BASE = "opportunities-"
 NUM_OLD_FILES_PRESERVED = 10
 ERR_CODE_TIMEOUT = 33
+CHROME_PROFILE_DIR = "/tmp/vsp_chrome_cache"
 
 
 def main():
     """
     Program for parsing opportunities data from the rotundasoftware.com web site.
     Use javascript in headless browser to login.
+    Reuse context and avoid re-login until necessary.
     Compare current opportunities against last remembered page.
     Write errors and progress output to stderr.
     Write to standard out ONLY if a change was detected.
@@ -45,20 +47,23 @@ def main():
 
     prev_content = get_previously_downloaded_events()
 
-    login(browser, url, user, password)
-
-    # why no redirect after login?
-    
     # .../web-terminal/login/guildtheatre?killSession=1
     # .../web-terminal/home
     home = re.sub(r'\/login\/.*', '/home', url)
-    
+
     try:
         browser.get(home)
 
-        if not is_logged_in(browser):
-            errprint("login unsuccessful")
-            sys.exit(1)
+        if is_logged_in(browser):
+            errprint("reusing existing session")
+        else:
+            login(browser, url, user, password)
+            browser.get(home)
+            if not is_logged_in(browser):
+                with open(FAILED_LOGIN_RESULT, 'w+') as f:
+                    f.write(browser.page_source)
+                errprint("failed login result page is at %s" % FAILED_LOGIN_RESULT)
+                sys.exit(1)
 
         # .../web-terminal/full-schedules
         full_schedules = re.sub(r'\/login\/.*', '/full-schedules', url)
@@ -144,6 +149,8 @@ def parseRotunda(content):
 def ensureDirs():
     if not os.path.exists(DOWNLOAD_DIR):
         os.mkdir(DOWNLOAD_DIR)
+    if not os.path.exists(CHROME_PROFILE_DIR):
+        os.mkdir(CHROME_PROFILE_DIR)
 
 
 def prompt_login_creds():
@@ -215,28 +222,22 @@ def wait4download(directory, timeout, nfiles=None):
         seconds += 1
     return seconds
 
-
 def is_logged_in(browser):
-    # a redirect to a page with a login means that you have NOT successfully logged in.
-    # a page with a login has "Sign In" in text.
+    # a redirect to a page with a login query means that you have NOT successfully logged in. 
+    # A successful page has word "Usher" in it.
     content = str(browser.page_source)
     success = "Don't have an account yet?" not in content and "Usher" in content
-    if not success:
-        with open(FAILED_LOGIN_RESULT, 'w+') as f:
-            f.write(browser.page_source)
-            errprint("failed login result page is at %s" % FAILED_LOGIN_RESULT)
-            sys.exit(1)
-
     return success
 
 
 def get_browser():
     options = webdriver.ChromeOptions()
-    options.add_argument('headless')
-    options.add_argument('no-sandbox')
-    options.add_argument('disable-dev-shm-usage')
-    options.add_argument(f'user-agent={USER_AGENT}')
-    
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument(f'--user-agent={USER_AGENT}')
+    options.add_argument(f'--user-data-dir={CHROME_PROFILE_DIR}')
+
     try:
         return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
     except OSError as e:
