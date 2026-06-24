@@ -54,9 +54,7 @@ def main():
     try:
         browser.get(home)
 
-        if is_logged_in(browser):
-            errprint("reusing existing session")
-        else:
+        if not is_logged_in(browser):
             login(browser, url, user, password)
             browser.get(home)
             if not is_logged_in(browser):
