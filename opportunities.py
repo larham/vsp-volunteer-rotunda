@@ -24,11 +24,12 @@ from bs4 import BeautifulSoup
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
 DOWNLOAD_DIR = os.path.dirname(os.path.abspath(
     __file__)) + "/opportunities/"
-FAILED_LOGIN_RESULT = "/tmp/post_login_result.html"
+VSP_FIRST_PAGE = "/tmp/vsp_first_page"
+FAILED_LOGIN_RESULT = "/tmp/vsp_post_login.html"
 OPPORTUNITIES_FILE_BASE = "opportunities-"
 NUM_OLD_FILES_PRESERVED = 10
 ERR_CODE_TIMEOUT = 33
-CHROME_PROFILE_DIR = "/tmp/vsp_chrome_cache"
+CHROME_PROFILE_DIR = "/tmp/vsp_browser_context"
 
 
 def main():
@@ -55,6 +56,8 @@ def main():
         browser.get(home)
 
         if not is_logged_in(browser):
+            with open(VSP_FIRST_PAGE, 'w+') as f:
+                f.write(browser.page_source)
             login(browser, url, user, password)
             browser.get(home)
             if not is_logged_in(browser):
@@ -165,17 +168,19 @@ def login(browser, url, user, password):
         # wait for full rendering
         submit = WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))
-
+    except TimeoutException:
+            errprint("login timed out on finding login button")
+            return
+    try:
         email = browser.find_element(By.NAME, "username")
         email.send_keys(user)
         passwd = browser.find_element(By.NAME, "value")
         passwd.send_keys(password)
         submit.click()
         WebDriverWait(browser, 15).until(EC.url_changes(browser.current_url))
+        errprint("url after login: %s" % browser.current_url)
     except TimeoutException:
-        errprint("login timed out; quitting")
-        sys.exit(ERR_CODE_TIMEOUT)
-    errprint("url after login: %s" % browser.current_url)
+        errprint("login timed out after clicking login button")
 
 
 def pretty_datetime():
