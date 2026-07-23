@@ -43,23 +43,32 @@ def main():
     Save contents of opportunities page to a new file ONLY if a change was detected.
     """
     browser = get_browser()
-    user, password, url = get_user_pass()
+    user, password, loginUrl, home = get_user_pass()
     ensureDirs()
 
     prev_content = get_previously_downloaded_events()
 
-    # .../web-terminal/login/guildtheatre?killSession=1
-    # .../web-terminal/home
-    home = re.sub(r'\/login\/.*', '/home', url)
-
     try:
         browser.get(home)
+        
+        try:
+            WebDriverWait(browser, 15).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//span[@class='name-or-initials']") # <span class="name-or-initials">Larry</span>
+                )
+            )
+        except TimeoutException:
+            errprint("failed to find 'Larry' span; not logged in?")
+            pass
 
+        # debug
+        with open(VSP_FIRST_PAGE, 'w+') as f:
+            f.write(browser.page_source)
         if not is_logged_in(browser):
-            with open(VSP_FIRST_PAGE, 'w+') as f:
-                f.write(browser.page_source)
-            login(browser, url, user, password)
+            login(browser, loginUrl, user, password)
             browser.get(home)
+            wait_for_schedule_tab(browser)
+            
             if not is_logged_in(browser):
                 with open(FAILED_LOGIN_RESULT, 'w+') as f:
                     f.write(browser.page_source)
@@ -67,22 +76,21 @@ def main():
                 sys.exit(1)
 
         # .../web-terminal/full-schedules
-        full_schedules = re.sub(r'\/login\/.*', '/full-schedules', url)
-        browser.get(full_schedules)
         content = str(browser.page_source)
-
         if not 'class="tab full-schedules selected"' in content:
             # try again
-            browser.get(full_schedules)
-            content = str(browser.page_source)
+            errprint("trying second time for logged-in home page...")
+            browser.get(home)
+            wait_for_schedule_tab(browser)
     except ReadTimeoutError:
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
             
+    content = str(browser.page_source)
     if not 'class="tab full-schedules selected"' in content:
         with open(FAILED_LOGIN_RESULT, 'w+') as f:
             f.write(content)
-        errprint("Cannot find tab selector in content at: " + full_schedules)
+        errprint("Cannot find tab selector in content at: " + home)
         errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
         sys.exit(1)
 
@@ -157,17 +165,18 @@ def ensureDirs():
 def prompt_login_creds():
     user = input("Username: ")
     password = getpass.getpass("Password: ")
-    url = input("URL for your organization's rotundasoftware.com site: ")
-    return user, password, url
+    login = input("Login URL for your organization's rotundasoftware.com site: ")
+    home = input("Home URL for your organization's rotundasoftware.com site: ")
+    return user, password, login, home
 
 
-def login(browser, url, user, password):
+def login(browser, loginUrl, user, password):
     errprint("attempting to log in...")
     try:
-        browser.get(url)
+        browser.get(loginUrl)
         # wait for full rendering
         submit = WebDriverWait(browser, 15).until(
-            EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))
+            EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))  # text = "Log In"
     except TimeoutException:
             errprint("login timed out on finding login button")
             return
@@ -225,6 +234,20 @@ def wait4download(directory, timeout, nfiles=None):
         seconds += 1
     return seconds
 
+def wait_for_schedule_tab(browser, timeout=15):
+    # the tab panel is populated by an async call after the page shell loads,
+    # so wait for it explicitly rather than racing browser.page_source
+    try:
+        WebDriverWait(browser, timeout).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "*[class~='full-schedules'][class~='selected']")
+            )
+        )
+        return True
+    except TimeoutException:
+        return False
+
+
 def is_logged_in(browser):
     # a redirect to a page with a login query means that you have NOT successfully logged in. 
     # A successful page has word "Usher" in it.
@@ -251,7 +274,8 @@ def get_browser():
 def get_user_pass():
     user = ""
     password = ""
-    url = ""
+    login = ""
+    home = ""
     if len(sys.argv) > 1:
         if not os.path.exists(sys.argv[1]):
             errprint("cannot find file: %s" % sys.argv[1])
@@ -261,21 +285,23 @@ def get_user_pass():
         try:
             user = config.get('Opportunities', 'username')
             password = config.get('Opportunities', 'password')
-            url = config.get('Opportunities', 'url')
+            login = config.get('Opportunities', 'login')
+            home = config.get('Opportunities', 'home')
         except Exception:
             errprint("""
-Expected file to have a header and 2 required entries like:
+Expected file to have a header and required entries like:
 
 [Opportunities]
 username=myemail@someserver.com
 password=mysecretpassword
-url=https://secure.rotundasoftware.com/info_with_my_organization_name
+login=https://secure.rotundasoftware.com/login/info_with_my_organization_name
+home=https://secure.rotundasoftware.com/info_with_my_organization_name
 """)
             sys.exit(1)
 
-    if user == "" or password == "" or url == "":
-        user, password, url = prompt_login_creds()
-    return user, password, url
+    if user == "" or password == "" or home == "" or login == "":
+        user, password, login, home = prompt_login_creds()
+    return user, password, login, home
 
 
 def get_previously_downloaded_events():
