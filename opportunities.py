@@ -54,11 +54,12 @@ def main():
         try:
             WebDriverWait(browser, 15).until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "//span[@class='name-or-initials']") # <span class="name-or-initials">Larry</span>
+                    (By.XPATH, "//div[@class='minister']") # <div class="minister"> (minister instead of usher, b/c history of app)
+                    # also could use <span class="name-or-initials">Larry</span> if we are sure of tabs
                 )
             )
         except TimeoutException:
-            errprint("failed to find 'Larry' span; not logged in?")
+            errprint("failed to find 'minister' div; not logged in?")
             pass
 
         # debug
@@ -66,33 +67,37 @@ def main():
             f.write(browser.page_source)
         if not is_logged_in(browser):
             login(browser, loginUrl, user, password)
-            browser.get(home)
-            wait_for_schedule_tab(browser)
-            
             if not is_logged_in(browser):
                 with open(FAILED_LOGIN_RESULT, 'w+') as f:
                     f.write(browser.page_source)
                 errprint("failed login result page is at %s" % FAILED_LOGIN_RESULT)
                 sys.exit(1)
 
+            browser.get(home)
+            have_sched = wait_for_schedule(browser)
+            if not have_sched:
+                with open(FAILED_LOGIN_RESULT, 'w+') as f:
+                    f.write(browser.page_source)
+                errprint("failed to find schedule, page is at %s" % FAILED_LOGIN_RESULT)
+                sys.exit(1)
+                
         # .../web-terminal/full-schedules
         content = str(browser.page_source)
-        if not 'class="tab full-schedules selected"' in content:
-            # try again
-            errprint("trying second time for logged-in home page...")
-            browser.get(home)
-            wait_for_schedule_tab(browser)
+        # if not 'class="tab full-schedules selected"' in content:
+        #     # try again
+        #     errprint("trying second time for home page with schedules tab...")
+        #     browser.get(home)
+        #     wait_for_schedule_tab(browser)
     except ReadTimeoutError:
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
             
-    content = str(browser.page_source)
-    if not 'class="tab full-schedules selected"' in content:
-        with open(FAILED_LOGIN_RESULT, 'w+') as f:
-            f.write(content)
-        errprint("Cannot find tab selector in content at: " + home)
-        errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
-        sys.exit(1)
+    # if not 'class="tab full-schedules selected"' in content:
+    #     with open(FAILED_LOGIN_RESULT, 'w+') as f:
+    #         f.write(content)
+    #     errprint("Cannot find tab selector in content at: " + home)
+    #     errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
+    #     sys.exit(1)
 
     current_events = parseRotunda(content)
     prev_events = parseRotunda(prev_content)
@@ -234,13 +239,14 @@ def wait4download(directory, timeout, nfiles=None):
         seconds += 1
     return seconds
 
-def wait_for_schedule_tab(browser, timeout=15):
+def wait_for_schedule(browser, timeout=15):
     # the tab panel is populated by an async call after the page shell loads,
     # so wait for it explicitly rather than racing browser.page_source
     try:
         WebDriverWait(browser, timeout).until(
             EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "*[class~='full-schedules'][class~='selected']")
+            (By.XPATH, "//div[@class='minister']")
+    #  (By.CSS_SELECTOR, "*[class~='full-schedules'][class~='selected']")
             )
         )
         return True
