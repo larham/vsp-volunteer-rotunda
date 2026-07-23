@@ -66,7 +66,7 @@ def main():
         if not have_sched:
             with open(VSP_FIRST_PAGE, 'w+') as f:
                 f.write(browser.page_source)
-            errprint("failed to find 'minister' div; and yet we are logged... did webpage layout change?")
+            errprint("failed to find schedule, and yet we are logged in... did the rotunda webpage layout change?")
             sys.exit(1)
                 
         content = str(browser.page_source)
@@ -75,6 +75,10 @@ def main():
         sys.exit(ERR_CODE_TIMEOUT)
             
     current_events = parseRotunda(content)
+    if len(current_events) < 10:
+        errprint("too few events found... did the format change?")
+        sys.exit(1)
+
     prev_events = parseRotunda(prev_content)
 
     # a set comparison in this direction will ignore any events in 'prev' which were expired by date
