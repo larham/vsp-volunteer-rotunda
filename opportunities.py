@@ -50,17 +50,7 @@ def main():
 
     try:
         browser.get(home)
-        
-        try:
-            WebDriverWait(browser, 15).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[@class='minister']") # <div class="minister"> (minister instead of usher, b/c history of app)
-                    # also could use <span class="name-or-initials">Larry</span> if we are sure of tabs
-                )
-            )
-        except TimeoutException:
-            # we'll try to login if necessary
-            pass
+        have_sched = wait_for_schedule(browser)
 
         if not is_logged_in(browser):
             login(browser, loginUrl, user, password)
@@ -72,19 +62,14 @@ def main():
 
             browser.get(home)
             have_sched = wait_for_schedule(browser)
-            if not have_sched:
-                with open(FAILED_LOGIN_RESULT, 'w+') as f:
-                    f.write(browser.page_source)
-                errprint("failed to find schedule, page is at %s" % FAILED_LOGIN_RESULT)
-                sys.exit(1)
-        else:
+        
+        if not have_sched:
             with open(VSP_FIRST_PAGE, 'w+') as f:
                 f.write(browser.page_source)
             errprint("failed to find 'minister' div; and yet we are logged... did webpage layout change?")
             sys.exit(1)
-
                 
-        content = str(browser.page_source)   # .../web-terminal/full-schedules
+        content = str(browser.page_source)
     except ReadTimeoutError:
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
