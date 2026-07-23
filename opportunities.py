@@ -59,12 +59,9 @@ def main():
                 )
             )
         except TimeoutException:
-            errprint("failed to find 'minister' div; not logged in?")
+            # we'll try to login if necessary
             pass
 
-        # debug
-        with open(VSP_FIRST_PAGE, 'w+') as f:
-            f.write(browser.page_source)
         if not is_logged_in(browser):
             login(browser, loginUrl, user, password)
             if not is_logged_in(browser):
@@ -80,25 +77,18 @@ def main():
                     f.write(browser.page_source)
                 errprint("failed to find schedule, page is at %s" % FAILED_LOGIN_RESULT)
                 sys.exit(1)
+        else:
+            with open(VSP_FIRST_PAGE, 'w+') as f:
+                f.write(browser.page_source)
+            errprint("failed to find 'minister' div; and yet we are logged... did webpage layout change?")
+            sys.exit(1)
+
                 
-        # .../web-terminal/full-schedules
-        content = str(browser.page_source)
-        # if not 'class="tab full-schedules selected"' in content:
-        #     # try again
-        #     errprint("trying second time for home page with schedules tab...")
-        #     browser.get(home)
-        #     wait_for_schedule_tab(browser)
+        content = str(browser.page_source)   # .../web-terminal/full-schedules
     except ReadTimeoutError:
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
             
-    # if not 'class="tab full-schedules selected"' in content:
-    #     with open(FAILED_LOGIN_RESULT, 'w+') as f:
-    #         f.write(content)
-    #     errprint("Cannot find tab selector in content at: " + home)
-    #     errprint("failed schedules result page is at %s" % FAILED_LOGIN_RESULT)
-    #     sys.exit(1)
-
     current_events = parseRotunda(content)
     prev_events = parseRotunda(prev_content)
 
