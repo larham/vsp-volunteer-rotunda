@@ -26,7 +26,6 @@ DOWNLOAD_DIR = os.path.dirname(os.path.abspath(
     __file__)) + "/opportunities/"
 VSP_FIRST_PAGE = "/tmp/vsp_first_page"
 FAILED_LOGIN_RESULT = "/tmp/vsp_post_login.html"
-OPPORTUNITIES_FILE_BASE = "opportunities-"
 NUM_OLD_FILES_PRESERVED = 10
 ERR_CODE_TIMEOUT = 33
 CHROME_PROFILE_DIR = "/tmp/vsp_browser_context"
@@ -35,12 +34,12 @@ CHROME_PROFILE_DIR = "/tmp/vsp_browser_context"
 def main():
     """
     Program for parsing opportunities data from the rotundasoftware.com web site.
-    Use javascript in headless browser to login.
-    Reuse context and avoid re-login until necessary.
-    Compare current opportunities against last remembered page.
+    Compare current opportunities against last remembered list of opportunities.
     Write errors and progress output to stderr.
     Write to standard out ONLY if a change was detected.
     Save contents of opportunities page to a new file ONLY if a change was detected.
+    Use javascript in headless browser to login if necessary.
+    Reuse context and avoid re-login until necessary.
     """
     browser = get_browser()
     user, password, loginUrl, home = get_user_pass()
@@ -51,8 +50,10 @@ def main():
     try:
         browser.get(home)
         have_sched = wait_for_schedule(browser)
-
-        if not is_logged_in(browser):
+        
+        # are we looking at the login screen?
+        content = str(browser.page_source)
+        if "Don't have an account yet?" in content:
             login(browser, loginUrl, user, password)
             if not is_logged_in(browser):
                 with open(FAILED_LOGIN_RESULT, 'w+') as f:
@@ -62,6 +63,7 @@ def main():
 
             browser.get(home)
             have_sched = wait_for_schedule(browser)
+            content = str(browser.page_source)
         
         if not have_sched:
             with open(VSP_FIRST_PAGE, 'w+') as f:
@@ -69,7 +71,6 @@ def main():
             errprint("failed to find schedule, and yet we are logged in... did the rotunda webpage layout change?")
             sys.exit(1)
                 
-        content = str(browser.page_source)
     except ReadTimeoutError:
         errprint("fetch timed out; quitting")
         sys.exit(ERR_CODE_TIMEOUT)
@@ -237,7 +238,7 @@ def is_logged_in(browser):
     # a redirect to a page with a login query means that you have NOT successfully logged in. 
     # A successful page has word "Usher" in it.
     content = str(browser.page_source)
-    success = "Don't have an account yet?" not in content and "Usher" in content
+    success = "Don't have an account yet?" not in content 
     return success
 
 
