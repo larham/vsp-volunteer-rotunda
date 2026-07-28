@@ -17,7 +17,8 @@ def main():
     * do not send anything if there are no changes and no error
     """
     url, param = get_url()
-    call = subprocess.run(["python", "opportunities.py", "guild.properties"],
+    prop_file = sys.argv[1] if len(sys.argv) > 1 else "guild.properties"
+    call = subprocess.run(["python", "opportunities.py", prop_file],
                           text=True,
                           capture_output=True)
 

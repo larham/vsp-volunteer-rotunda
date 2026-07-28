@@ -8,6 +8,7 @@ import sys
 import time
 import re
 import natsort
+from urllib import request, parse
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -41,9 +42,9 @@ def main():
     Use javascript in headless browser to login if necessary.
     Reuse context and avoid re-login until necessary.
     """
-    browser = get_browser()
     user, password, loginUrl, home = get_user_pass()
     ensureDirs()
+    browser = get_browser()
 
     prev_content = get_previously_downloaded_events()
 
@@ -140,10 +141,32 @@ def parseRotunda(content):
         
     return events
 
-def ensureDirs():
+def send_google_form_message(msg, config_file=None):
+    if not config_file and len(sys.argv) > 1:
+        config_file = sys.argv[1]
+    if config_file and os.path.exists(config_file):
+        config = configparser.RawConfigParser()
+        config.read(config_file)
+        try:
+            url = config.get('Cron', 'url')
+            param = config.get('Cron', 'param')
+            if url and param:
+                data = parse.urlencode({param: msg}).encode()
+                req = request.Request(url, data=data)
+                request.urlopen(req)
+        except Exception as e:
+            errprint("failed to send google form message: %s" % e)
+
+
+def ensureDirs(config_file=None):
     if not os.path.exists(DOWNLOAD_DIR):
         os.mkdir(DOWNLOAD_DIR)
     if not os.path.exists(CHROME_PROFILE_DIR):
+        errprint("browser context directory not found: %s" % CHROME_PROFILE_DIR)
+        send_google_form_message(
+            "The VSP scan tool is creating a browser context, perhaps after a reboot.",
+            config_file=config_file
+        )
         os.mkdir(CHROME_PROFILE_DIR)
 
 
@@ -308,4 +331,5 @@ def get_previously_downloaded_events():
     return prev_content
 
 
-main()
+if __name__ == '__main__':
+    main()
