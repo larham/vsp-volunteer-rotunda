@@ -90,7 +90,7 @@ def main():
         if not prev_events:
             errprint(
                 "Initial results were recorded successfully. Please run again later to compare.")
-            sys.exit(0)  # first time running comparison
+            sys.exit(0)  # first time running comparison; we're finished for now.
 
         print_diff([current_events[id] for id in diff])
     else:
