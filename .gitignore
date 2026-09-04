@@ -2,7 +2,6 @@
 *.properties
 .DS_Store
 .venv
-.python-version
 opportunities.egg-info/
 build/
 dist/
