@@ -3,6 +3,7 @@
 import configparser
 import datetime
 import getpass
+import json
 import os
 import sys
 import time
@@ -14,10 +15,14 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    WebDriverException,
+)
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
-from urllib3.exceptions import ReadTimeoutError
+from urllib3.exceptions import HTTPError, ReadTimeoutError
 
 from bs4 import BeautifulSoup
 
@@ -30,6 +35,23 @@ FAILED_LOGIN_RESULT = "/tmp/vsp_post_login.html"
 NUM_OLD_FILES_PRESERVED = 10
 ERR_CODE_TIMEOUT = 33
 CHROME_PROFILE_DIR = "/tmp/vsp_browser_context"
+ERRORS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "errors.json")
+ERROR_RETENTION_DAYS = 30
+TRANSIENT_ERROR_DAYS = 2
+TRANSIENT_PAGE_ERROR_PATTERNS = (
+    "502 bad gateway",
+    "503 service temporarily unavailable",
+    "503 service unavailable",
+    "504 gateway time-out",
+    "504 gateway timeout",
+    "error 502",
+    "error 503",
+    "error 504",
+    "cloudfront",
+    "this site can’t be reached",
+    "this site can't be reached",
+    "net::err_",
+)
 
 
 def main():
@@ -67,19 +89,28 @@ def main():
             content = str(browser.page_source)
         
         if not have_sched:
+            # Retry once in case the async XHR populating the schedule tab timed out transiently
+            browser.get(home)
+            have_sched = wait_for_schedule(browser)
+            content = str(browser.page_source)
+
+        if not have_sched:
+            if is_transient_page_error(content):
+                handle_transient_error("transient empty/gateway error page when loading schedule")
             with open(VSP_FIRST_PAGE, 'w+') as f:
                 f.write(browser.page_source)
             errprint("failed to find schedule, and yet we are logged in... did the rotunda webpage layout change?")
             sys.exit(1)
                 
-    except ReadTimeoutError:
-        errprint("fetch timed out; quitting")
-        sys.exit(ERR_CODE_TIMEOUT)
+    except (ReadTimeoutError, HTTPError, WebDriverException) as e:
+        handle_transient_error("transient fetch/webdriver error; quitting: %s" % e)
             
     current_events = parseRotunda(content)
     if len(current_events) < 10:
         errprint("too few events found... did the format change?")
         sys.exit(1)
+
+    record_success()
 
     prev_events = parseRotunda(prev_content)
 
@@ -95,6 +126,120 @@ def main():
         print_diff([current_events[id] for id in diff])
     else:
         errprint("no change")
+
+
+def is_transient_page_error(content):
+    if not content:
+        return True
+    soup = BeautifulSoup(content, 'html.parser')
+    body_text = soup.get_text(strip=True).lower()
+    if not body_text:
+        return True
+    return any(pattern in body_text for pattern in TRANSIENT_PAGE_ERROR_PATTERNS)
+
+
+def load_error_data(errors_file=None):
+    if errors_file is None:
+        errors_file = ERRORS_FILE
+    if os.path.exists(errors_file):
+        try:
+            with open(errors_file, 'r') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {
+                    "last_success": data.get("last_success"),
+                    "errors": data.get("errors", []),
+                }
+            elif isinstance(data, list):
+                return {"last_success": None, "errors": data}
+        except (OSError, ValueError, TypeError):
+            pass
+    return {"last_success": None, "errors": []}
+
+
+def save_error_data(data, errors_file=None):
+    if errors_file is None:
+        errors_file = ERRORS_FILE
+    with open(errors_file, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def prune_old_errors(errors, now):
+    cutoff = now - datetime.timedelta(days=ERROR_RETENTION_DAYS)
+    kept = []
+    for entry in errors:
+        try:
+            ts = datetime.datetime.fromisoformat(entry["timestamp"])
+            if ts >= cutoff:
+                kept.append(entry)
+        except (KeyError, ValueError, TypeError):
+            continue
+    return kept
+
+
+def record_success(now=None, errors_file=None):
+    now = now or datetime.datetime.now()
+    data = load_error_data(errors_file)
+    data["errors"] = prune_old_errors(data["errors"], now)
+    data["last_success"] = now.isoformat(timespec="seconds")
+    save_error_data(data, errors_file)
+    return data
+
+
+def record_transient_error(error_msg, now=None, errors_file=None):
+    now = now or datetime.datetime.now()
+    data = load_error_data(errors_file)
+    data["errors"] = prune_old_errors(data["errors"], now)
+    data["errors"].append({
+        "timestamp": now.isoformat(timespec="seconds"),
+        "error": str(error_msg),
+    })
+    save_error_data(data, errors_file)
+    return data
+
+
+def is_transient_error_persistent(data, now=None):
+    """
+    Returns True if transient errors have been piling up consistently for more than
+    TRANSIENT_ERROR_DAYS (2 days) without a successful run.
+    """
+    now = now or datetime.datetime.now()
+    errors = data.get("errors", [])
+    if not errors:
+        return False
+
+    last_success_str = data.get("last_success")
+    last_success_dt = None
+    if last_success_str:
+        try:
+            last_success_dt = datetime.datetime.fromisoformat(last_success_str)
+        except ValueError:
+            last_success_dt = None
+
+    streak_timestamps = []
+    for entry in errors:
+        try:
+            ts = datetime.datetime.fromisoformat(entry["timestamp"])
+            if last_success_dt is None or ts > last_success_dt:
+                streak_timestamps.append(ts)
+        except (KeyError, ValueError, TypeError):
+            continue
+
+    if not streak_timestamps:
+        return False
+
+    earliest_unresolved = min(streak_timestamps)
+    return (now - earliest_unresolved) > datetime.timedelta(days=TRANSIENT_ERROR_DAYS)
+
+
+def handle_transient_error(msg, now=None, errors_file=None):
+    errprint(msg)
+    now = now or datetime.datetime.now()
+    data = record_transient_error(msg, now=now, errors_file=errors_file)
+    if is_transient_error_persistent(data, now=now):
+        errprint("Transient errors have repeated for more than %d days; reporting." % TRANSIENT_ERROR_DAYS)
+        sys.exit(1)
+    sys.exit(ERR_CODE_TIMEOUT)
 
 
 def print_diff(list):
@@ -186,8 +331,10 @@ def login(browser, loginUrl, user, password):
         submit = WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((By.XPATH, "//button[@class='button']")))  # text = "Log In"
     except TimeoutException:
-            errprint("login timed out on finding login button")
-            return
+        if is_transient_page_error(str(browser.page_source)):
+            handle_transient_error("login timed out on empty/gateway error page")
+        errprint("login timed out on finding login button")
+        return
     try:
         email = browser.find_element(By.NAME, "username")
         email.send_keys(user)
@@ -196,8 +343,11 @@ def login(browser, loginUrl, user, password):
         submit.click()
         WebDriverWait(browser, 15).until(EC.url_changes(browser.current_url))
         errprint("url after login: %s" % browser.current_url)
+    except NoSuchElementException as e:
+        errprint("login form element not found; did the login page layout change? %s" % e)
+        return
     except TimeoutException:
-        errprint("login timed out after clicking login button")
+        handle_transient_error("login timed out after clicking login button")
 
 
 def pretty_datetime():
@@ -248,8 +398,12 @@ def wait_for_schedule(browser, timeout=15):
     try:
         WebDriverWait(browser, timeout).until(
             EC.presence_of_element_located(
-            (By.XPATH, "//div[@class='minister']")
-    #  (By.CSS_SELECTOR, "*[class~='full-schedules'][class~='selected']")
+                (By.XPATH, "//div[@class='minister']")
+            )
+        )
+        WebDriverWait(browser, timeout).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "td.modui-base.ministry-group-view.label")
             )
         )
         return True
@@ -275,9 +429,8 @@ def get_browser():
 
     try:
         return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-    except OSError as e:
-        errprint("error getting browser; exiting", e)
-        sys.exit(ERR_CODE_TIMEOUT)
+    except (OSError, WebDriverException, HTTPError) as e:
+        handle_transient_error("error getting browser; exiting: %s" % e)
 
 
 def get_user_pass():

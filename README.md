@@ -76,7 +76,20 @@ INSTALL_DIR=/path/to/opportunities/
 0 9-22 * * * date > $LOG && cd $INSTALL_DIR >> $LOG 2>&1  && /usr/bin/bash $INSTALL_DIR/cron.sh >> $LOG 2>&1
 ```
 
+## Error Tracking (`errors.json`)
+
+`opportunities.py` maintains a local `errors.json` file to track transient network and browser timeouts across runs (retaining 30 days of records). Transient errors are suppressed from triggering notifications unless they repeat consistently for more than 2 days without a successful run, whereas structural or login errors (such as webpage layout changes) trigger an immediate notification.
+
+## Running Tests
+
+To run the unit test suite:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Disclaimers
 
 This Opportunity software and its authors are NOT affiliated with Rotunda Software Inc.
 Google is a trademark of Google, Inc.
+
